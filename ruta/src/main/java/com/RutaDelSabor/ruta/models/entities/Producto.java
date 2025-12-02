@@ -2,6 +2,7 @@ package com.RutaDelSabor.ruta.models.entities;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import com.fasterxml.jackson.annotation.JsonProperty; // <--- 1. IMPORTAR
 import jakarta.persistence.*;
 
 @Entity
@@ -11,7 +12,7 @@ public class Producto {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
+     @JsonProperty("nombre") // <--- 2. AGREGAR ESTA LÍNEA SOBRE EL CAMPO "producto"
     private String producto;
     
     @Column(precision = 10, scale = 2)

@@ -140,12 +140,13 @@ public class PedidoController {
     // --- Endpoints CRUD y Paneles Internos ---
 
     // [CRÍTICO - PERMISOS] Permisos para obtener todos los pedidos (Cohesión con Admin, Vendedor y Delivery)
-    @GetMapping("/pedidos")
-    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'DELIVERY')") // <<-- CORRECCIÓN DE PERMISOS
-    public List<Pedido> getAll() {
-        log.info("Admin/Internal: Obteniendo todos los pedidos.");
-        return pedidoService.GetAll();
-    }
+  // Busca este método y asegúrate de que tenga estos permisos exactos:
+@GetMapping("/pedidos")
+@PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'DELIVERY')") // <--- CRÍTICO: Añadir VENDEDOR y DELIVERY
+public List<Pedido> getAll() {
+    log.info("Solicitud de lista de pedidos autorizada.");
+    return pedidoService.GetAll();
+}
 
     // [CRÍTICO - COHESIÓN CON FRONTEND] ENDPOINT PARA ACTUALIZAR ESTADO DE PEDIDO (Delivery/Admin)
     @PutMapping("/admin/pedidos/{id}/estado") 

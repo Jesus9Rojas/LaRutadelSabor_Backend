@@ -1,6 +1,5 @@
-// Archivo: ruta/src/main/java/com/RutaDelSabor/ruta/security/UserDetailsServiceImpl.java
-
 package com.RutaDelSabor.ruta.security;
+
 import com.RutaDelSabor.ruta.models.dao.IClienteDAO;
 import com.RutaDelSabor.ruta.models.entities.Cliente;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,7 +12,6 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
-// import java.util.ArrayList; // <--- ESTA LÍNEA SE HA ELIMINADO
 
 @Service
 public class UserDetailsServiceImpl implements UserDetailsService {
@@ -24,9 +22,19 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         Cliente cliente = clienteRepository.findByCorreo(username)
-                .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado con correo: " + username));
+                .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado: " + username));
 
-        GrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + cliente.getRol().getName().toUpperCase());
+        // --- CORRECCIÓN AQUÍ ---
+        String nombreRol = cliente.getRol().getName().toUpperCase();
+        
+        // Solo agregamos "ROLE_" si NO lo tiene ya.
+        // Como tu BD ya tiene "ROLE_ADMIN", esto evita que quede "ROLE_ROLE_ADMIN"
+        if (!nombreRol.startsWith("ROLE_")) {
+            nombreRol = "ROLE_" + nombreRol;
+        }
+
+        GrantedAuthority authority = new SimpleGrantedAuthority(nombreRol);
+        // -----------------------
 
         return new User(cliente.getCorreo(), cliente.getContraseña(), Collections.singletonList(authority));
     }

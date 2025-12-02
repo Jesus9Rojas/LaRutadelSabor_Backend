@@ -15,6 +15,7 @@ import com.RutaDelSabor.ruta.services.IClienteService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+@SuppressWarnings("unused")
 @RestController
 @RequestMapping("/api/clientes")
 public class ClienteController {

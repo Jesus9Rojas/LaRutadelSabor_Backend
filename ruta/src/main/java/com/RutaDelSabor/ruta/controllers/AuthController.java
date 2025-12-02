@@ -55,4 +55,21 @@ public class AuthController {
                     .body(new ErrorResponseDTO("Ocurrió un error durante el login."));
         }
     }
+    // Endpoint protegido solo para ADMIN
+    @PostMapping("/register-employee")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> registerEmployee(@Valid @RequestBody com.RutaDelSabor.ruta.dto.RegisterEmployeeRequest request) {
+        try {
+            authService.registerEmployee(request);
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body("Empleado registrado exitosamente con rol: " + request.getRol());
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ErrorResponseDTO(e.getMessage()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponseDTO("Error al registrar empleado."));
+        }
+    }
 }

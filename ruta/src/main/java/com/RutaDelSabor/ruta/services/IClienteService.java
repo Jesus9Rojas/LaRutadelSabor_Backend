@@ -6,6 +6,7 @@ import java.util.List;
 import com.RutaDelSabor.ruta.models.entities.Cliente;
 import com.RutaDelSabor.ruta.models.entities.Cliente;
 import com.RutaDelSabor.ruta.exception.RecursoNoEncontradoException;
+@SuppressWarnings("unused")
 public interface IClienteService {
 
     // Métodos para la lógica de negocio (los que ya tienes en ClienteServiceImpl)

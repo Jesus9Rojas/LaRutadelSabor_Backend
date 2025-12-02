@@ -71,4 +71,24 @@ public class AuthService {
         // 3. Generar y devolver el token JWT
         return jwtUtil.generateToken(userDetails);
     }
+    // Método exclusivo para admins
+    public com.RutaDelSabor.ruta.models.entities.Cliente registerEmployee(com.RutaDelSabor.ruta.dto.RegisterEmployeeRequest request) {
+        if (clienteRepository.findByCorreo(request.getCorreo()).isPresent()) {
+            throw new RuntimeException("El correo electrónico ya está registrado");
+        }
+
+        // Buscar el rol solicitado (Asegúrate de enviar el nombre exacto: VENDEDOR, DELIVERY, ADMIN)
+        Rol rolAsignado = rolRepository.findByName(request.getRol().toUpperCase())
+            .orElseThrow(() -> new RuntimeException("Error: Rol '" + request.getRol() + "' no encontrado."));
+
+        com.RutaDelSabor.ruta.models.entities.Cliente nuevoEmpleado = new com.RutaDelSabor.ruta.models.entities.Cliente();
+        nuevoEmpleado.setNombre(request.getNombre());
+        nuevoEmpleado.setApellido(request.getApellido());
+        nuevoEmpleado.setCorreo(request.getCorreo());
+        nuevoEmpleado.setTelefono(String.valueOf(request.getTelefono()));
+        nuevoEmpleado.setContraseña(passwordEncoder.encode(request.getContraseña()));
+        nuevoEmpleado.setRol(rolAsignado); // Asignamos el rol específico
+
+        return clienteRepository.save(nuevoEmpleado);
+    }
 }

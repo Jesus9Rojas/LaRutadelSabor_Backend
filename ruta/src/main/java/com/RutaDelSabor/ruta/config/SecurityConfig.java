@@ -61,6 +61,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/comentarios").permitAll() // <--- AGREGAR ESTA LÍNEA
                 .requestMatchers(HttpMethod.GET, "/api/menu").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/webhook/dialogflow").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/productos/**").permitAll()

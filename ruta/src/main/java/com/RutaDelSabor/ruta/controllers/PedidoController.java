@@ -25,11 +25,9 @@ import com.RutaDelSabor.ruta.services.IPedidoService;
 import com.RutaDelSabor.ruta.services.PedidoServiceImpl; 
 import jakarta.validation.Valid;
 
-// DTO interno para actualización de estado
 class EstadoUpdateRequestDTO {
     private String nuevoEstado;
     private String notas;
-    
     public String getNuevoEstado() { return nuevoEstado; }
     public void setNuevoEstado(String nuevoEstado) { this.nuevoEstado = nuevoEstado; }
     public String getNotas() { return notas; }
@@ -48,132 +46,89 @@ public class PedidoController {
     @Autowired
     private PedidoServiceImpl pedidoServiceImpl; 
 
-    // --- ENDPOINT CREAR ORDEN (CLIENTE) ---
     @PostMapping("/ordenes")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> crearOrden(
-            @Valid @RequestBody OrdenRequestDTO ordenRequest,
-            @AuthenticationPrincipal UserDetails userDetails) {
-        log.info("Recibida petición POST /api/ordenes por usuario: {}", userDetails.getUsername());
+    public ResponseEntity<?> crearOrden(@Valid @RequestBody OrdenRequestDTO ordenRequest, @AuthenticationPrincipal UserDetails userDetails) {
         try {
             Pedido nuevoPedido = pedidoService.crearNuevaOrden(ordenRequest, userDetails);
-            log.info("Orden creada exitosamente con ID: {}", nuevoPedido.getId());
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(new OrdenResponseDTO(nuevoPedido.getId(),
-                            "Pedido recibido exitosamente con ID: " + nuevoPedido.getId()));
+            return ResponseEntity.status(HttpStatus.CREATED).body(new OrdenResponseDTO(nuevoPedido.getId(), "Pedido recibido."));
         } catch (StockInsuficienteException | ProductoNoEncontradoException e) {
-            log.warn("Error de validación al crear orden: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponseDTO(e.getMessage()));
         } catch (Exception e) {
-            log.error("Error inesperado al crear orden:", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDTO("Error interno al procesar el pedido. Intente más tarde."));
+            log.error("Error crear orden:", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDTO("Error interno."));
         }
     }
 
-    // --- ENDPOINT OBTENER DETALLES (CLIENTE) ---
     @GetMapping("/ordenes/{id}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> getPedidoByIdCliente(
-            @PathVariable Long id,
-            @AuthenticationPrincipal UserDetails userDetails) {
-        log.info("Cliente: Solicitud GET /api/ordenes/{}", id);
+    public ResponseEntity<?> getPedidoByIdCliente(@PathVariable Long id, @AuthenticationPrincipal UserDetails userDetails) {
         try {
             Pedido pedido = pedidoService.FindByID(id); 
             if (!pedido.getCliente().getCorreo().equals(userDetails.getUsername())) {
-                log.warn("Intento de acceso no autorizado al pedido ID {} por usuario {}", id, userDetails.getUsername());
-                throw new PedidoNoEncontradoException("Pedido no encontrado o no pertenece al usuario.");
+                throw new PedidoNoEncontradoException("No autorizado.");
             }
             return ResponseEntity.ok(pedido);
         } catch (PedidoNoEncontradoException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponseDTO(e.getMessage()));
         } catch (Exception e) {
-            log.error("Error al obtener el pedido ID {}:", id, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDTO("Error al obtener el pedido."));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDTO("Error al obtener pedido."));
         }
     }
 
-    // --- ENDPOINT OBTENER ESTADO ---
     @GetMapping("/ordenes/{id}/estado")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> getEstadoOrden(
-            @PathVariable Long id,
-            @AuthenticationPrincipal UserDetails userDetails) {
-        log.info("Recibida petición GET /api/ordenes/{}/estado por usuario: {}", id, userDetails.getUsername());
+    public ResponseEntity<?> getEstadoOrden(@PathVariable Long id, @AuthenticationPrincipal UserDetails userDetails) {
         try {
             String estado = pedidoService.obtenerEstadoPedido(id, userDetails);
-            log.info("Estado obtenido para pedido ID {}: {}", id, estado);
             return ResponseEntity.ok(new EstadoResponseDTO(estado));
         } catch (PedidoNoEncontradoException e) {
-            log.warn("Pedido no encontrado o sin acceso para usuario {}: {}", userDetails.getUsername(), e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponseDTO(e.getMessage()));
         } catch (Exception e) {
-            log.error("Error al obtener estado del pedido ID {}:", id, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDTO("Error al obtener el estado del pedido."));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDTO("Error al obtener estado."));
         }
     }
 
-    // --- ENDPOINT OBTENER HISTORIAL ---
     @GetMapping("/clientes/me/historial")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> getHistorialPedidos(@AuthenticationPrincipal UserDetails userDetails) {
-        log.info("Recibida petición GET /api/clientes/me/historial por usuario: {}", userDetails.getUsername());
         try {
             List<Pedido> historial = pedidoService.obtenerHistorialPedidos(userDetails);
-            List<PedidoHistorialDTO> historialDTO = historial.stream()
-                    .map(PedidoHistorialDTO::fromEntity)
-                    .collect(Collectors.toList());
-            log.info("Historial obtenido para usuario {}: {} pedidos.", userDetails.getUsername(), historialDTO.size());
+            List<PedidoHistorialDTO> historialDTO = historial.stream().map(PedidoHistorialDTO::fromEntity).collect(Collectors.toList());
             return ResponseEntity.ok(historialDTO);
         } catch (Exception e) {
-            log.error("Error al obtener historial para usuario {}:", userDetails.getUsername(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDTO("Error al obtener el historial de pedidos."));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDTO("Error historial."));
         }
     }
 
-    // --- ENDPOINTS ADMINISTRATIVOS Y DE GESTIÓN ---
-
-    // [CRÍTICO] Endpoint específico para el Panel de Administración (Soluciona error 403)
+    // Endpoint crítico para Admin/Vendedor
     @GetMapping("/admin/pedidos")
     @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'DELIVERY')")
     public ResponseEntity<List<Pedido>> getAllPedidosAdmin() {
-        log.info("Admin/Vendedor: Solicitando lista completa de pedidos en /api/admin/pedidos");
         try {
             List<Pedido> pedidos = pedidoService.GetAll();
             return ResponseEntity.ok(pedidos);
         } catch (Exception e) {
-            log.error("Error crítico al obtener pedidos para admin:", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
-    // Actualizar estado del pedido (Delivery/Admin)
     @PutMapping("/admin/pedidos/{id}/estado") 
     @PreAuthorize("hasAnyRole('ADMIN', 'DELIVERY')")
-    public ResponseEntity<?> updatePedidoStatus(
-            @PathVariable Long id,
-            @RequestBody EstadoUpdateRequestDTO estadoRequest) {
-        log.info("Admin/Delivery: Actualizando estado del pedido ID: {} a '{}'", id, estadoRequest.getNuevoEstado());
+    public ResponseEntity<?> updatePedidoStatus(@PathVariable Long id, @RequestBody EstadoUpdateRequestDTO estadoRequest) {
         try {
-            Pedido actualizado = pedidoServiceImpl.actualizarEstadoPedido( 
-                    id, 
-                    estadoRequest.getNuevoEstado(), 
-                    estadoRequest.getNotas()
-            );
+            Pedido actualizado = pedidoServiceImpl.actualizarEstadoPedido(id, estadoRequest.getNuevoEstado(), estadoRequest.getNotas());
             return ResponseEntity.ok(actualizado); 
         } catch (PedidoNoEncontradoException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponseDTO(e.getMessage()));
         } catch (Exception e) {
-            log.error("Admin/Delivery: Error al actualizar estado del pedido ID {}:", id, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDTO("Error al actualizar el estado del pedido."));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDTO("Error actualizar estado."));
         }
     }
-
-    // --- Endpoints exclusivos de ADMIN (Gestión profunda) ---
 
     @GetMapping("/pedidos/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> getPedidoByIdAdmin(@PathVariable Long id) {
-        log.info("Admin: Obteniendo pedido ID: {}", id);
         try {
             Pedido pedido = pedidoService.FindByID(id);
             return ResponseEntity.ok(pedido);
@@ -185,7 +140,6 @@ public class PedidoController {
     @PutMapping("/pedidos/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updatePedidoAdmin(@PathVariable Long id, @RequestBody Pedido pedidoActualizado) {
-        log.info("Admin: Actualizando pedido ID: {}", id);
         try {
             Pedido pedidoExistente = pedidoService.FindByID(id); 
             if (pedidoActualizado.getEstadoActual() != null) {
@@ -196,8 +150,7 @@ public class PedidoController {
         } catch (PedidoNoEncontradoException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponseDTO(e.getMessage()));
         } catch (Exception e) {
-            log.error("Admin: Error al actualizar pedido ID {}:", id, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDTO("Error al actualizar pedido."));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDTO("Error actualizar."));
         }
     }
 
@@ -205,16 +158,12 @@ public class PedidoController {
     @PreAuthorize("hasRole('ADMIN')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public ResponseEntity<Void> deletePedidoAdmin(@PathVariable Long id) {
-        log.warn("Admin: Solicitando borrado lógico de pedido ID: {}", id);
         try {
             pedidoService.Delete(id);
-            log.info("Admin: Borrado lógico de pedido ID {} completado.", id);
             return ResponseEntity.noContent().build();
         } catch (PedidoNoEncontradoException e) {
-            log.error("Admin: Error al borrar, pedido ID {} no encontrado.", id);
             return ResponseEntity.notFound().build();
         } catch (Exception e) {
-            log.error("Admin: Error inesperado al borrar pedido ID {}:", id, e);
             return ResponseEntity.internalServerError().build();
         }
     }

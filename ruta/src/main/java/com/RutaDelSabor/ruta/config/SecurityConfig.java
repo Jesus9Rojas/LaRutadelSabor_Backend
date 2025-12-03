@@ -14,17 +14,15 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder; // IMPORTANTE
 import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import static org.springframework.security.config.Customizer.withDefaults;
 
-@SuppressWarnings("unused")
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity // Permite @PreAuthorize en los controladores
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Autowired
@@ -33,10 +31,9 @@ public class SecurityConfig {
     @Autowired
     private UserDetailsServiceImpl userDetailsService;
 
-   @SuppressWarnings("deprecation") 
+    @SuppressWarnings("deprecation")
     @Bean
     public PasswordEncoder passwordEncoder() {
-        // CONFIRMADO: Texto plano para coincidir con 'admin', 'vendedor', etc.
         return NoOpPasswordEncoder.getInstance();
     }
 
@@ -59,16 +56,30 @@ public class SecurityConfig {
             .cors(withDefaults())
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                // --- RUTAS PÚBLICAS (Login y Clientes Anónimos) ---
-                .requestMatchers("/api/auth/**").permitAll()
-                // Permitir ver productos/menú sin login (Soluciona "No disponible")
-                .requestMatchers(HttpMethod.GET, "/api/menu").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/productos/**").permitAll() 
-                .requestMatchers(HttpMethod.GET, "/api/categorias/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/comentarios").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/webhook/dialogflow").permitAll()
+                // 1. REGLAS CRÍTICAS (Orden específico: De lo más restrictivo a lo más general)
                 
-                // --- RUTAS PROTEGIDAS ---
+                // Permitir preflight requests (CORS) para que el navegador no bloquee
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                
+                // Login y Auth siempre públicos
+                .requestMatchers("/api/auth/**").permitAll()
+                
+                // 2. PROTEGER RUTAS DE ADMIN DENTRO DE PRODUCTOS
+                // Esto soluciona el 403: Forzamos autenticación antes de que la regla pública capture la ruta
+                .requestMatchers("/api/productos/admin/**").hasAnyRole("ADMIN", "VENDEDOR") 
+                .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "VENDEDOR", "DELIVERY")
+
+                // 3. RUTAS PÚBLICAS (Menú y Catálogo para clientes)
+                // Ahora sí, el resto de productos son públicos
+                .requestMatchers(HttpMethod.GET, "/api/productos/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/categorias/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/menu").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/comentarios").permitAll()
+                
+                // Webhook
+                .requestMatchers(HttpMethod.POST, "/api/webhook/dialogflow").permitAll()
+
+                // Todo lo demás requiere login
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session

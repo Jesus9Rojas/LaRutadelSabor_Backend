@@ -24,13 +24,18 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         Cliente cliente = clienteRepository.findByCorreo(username)
                 .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado: " + username));
 
-        // --- CORRECCIÓN MAESTRA: Evitar doble prefijo ---
-        String nombreRol = cliente.getRol().getName().toUpperCase();
+        if (cliente.getRol() == null || cliente.getRol().getName() == null) {
+            throw new UsernameNotFoundException("El usuario no tiene un rol asignado");
+        }
+
+        // --- NORMALIZACIÓN DE ROLES ---
+        String nombreRol = cliente.getRol().getName().toUpperCase().trim();
+        
+        // Spring Security requiere el prefijo "ROLE_" para funcionar con hasRole()
         if (!nombreRol.startsWith("ROLE_")) {
             nombreRol = "ROLE_" + nombreRol;
         }
-        // Resultado garantizado: "ROLE_ADMIN", "ROLE_VENDEDOR", etc.
-
+        
         GrantedAuthority authority = new SimpleGrantedAuthority(nombreRol);
 
         return new User(cliente.getCorreo(), cliente.getContraseña(), Collections.singletonList(authority));

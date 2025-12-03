@@ -1,10 +1,7 @@
-// Archivo: ruta/src/main/java/com/RutaDelSabor/ruta/controllers/PedidoController.java
-
 package com.RutaDelSabor.ruta.controllers;
 
 import java.util.List;
 import java.util.stream.Collectors;
-
 
 import com.RutaDelSabor.ruta.dto.ErrorResponseDTO;
 import com.RutaDelSabor.ruta.dto.EstadoResponseDTO;
@@ -25,11 +22,10 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import com.RutaDelSabor.ruta.models.entities.Pedido;
 import com.RutaDelSabor.ruta.services.IPedidoService;
-import com.RutaDelSabor.ruta.services.PedidoServiceImpl; // [CRÍTICO] Necesario para updatePedidoStatus
+import com.RutaDelSabor.ruta.services.PedidoServiceImpl; 
 import jakarta.validation.Valid;
 
-
-// [CRÍTICO - DTO ADICIONAL] DTO de solicitud para actualizar estado (debe estar en el paquete DTOs, se incluye aquí para contexto)
+// DTO interno para actualización de estado
 class EstadoUpdateRequestDTO {
     private String nuevoEstado;
     private String notas;
@@ -39,7 +35,6 @@ class EstadoUpdateRequestDTO {
     public String getNotas() { return notas; }
     public void setNotas(String notas) { this.notas = notas; }
 }
-
 
 @RestController
 @RequestMapping("/api")
@@ -51,10 +46,9 @@ public class PedidoController {
     private IPedidoService pedidoService;
     
     @Autowired
-    private PedidoServiceImpl pedidoServiceImpl; // <<-- INYECCIÓN CRÍTICA para el PUT de estado
+    private PedidoServiceImpl pedidoServiceImpl; 
 
-
-    // --- ENDPOINT CREAR ORDEN ---
+    // --- ENDPOINT CREAR ORDEN (CLIENTE) ---
     @PostMapping("/ordenes")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> crearOrden(
@@ -76,7 +70,7 @@ public class PedidoController {
         }
     }
 
-    // [CRÍTICO - COHESIÓN CON FRONTEND] ENDPOINT PARA OBTENER DETALLES DE UN PEDIDO POR CLIENTE (js/confirmacion.js)
+    // --- ENDPOINT OBTENER DETALLES (CLIENTE) ---
     @GetMapping("/ordenes/{id}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> getPedidoByIdCliente(
@@ -85,7 +79,6 @@ public class PedidoController {
         log.info("Cliente: Solicitud GET /api/ordenes/{}", id);
         try {
             Pedido pedido = pedidoService.FindByID(id); 
-            // Verificación de propiedad para seguridad
             if (!pedido.getCliente().getCorreo().equals(userDetails.getUsername())) {
                 log.warn("Intento de acceso no autorizado al pedido ID {} por usuario {}", id, userDetails.getUsername());
                 throw new PedidoNoEncontradoException("Pedido no encontrado o no pertenece al usuario.");
@@ -137,18 +130,23 @@ public class PedidoController {
         }
     }
 
-    // --- Endpoints CRUD y Paneles Internos ---
+    // --- ENDPOINTS ADMINISTRATIVOS Y DE GESTIÓN ---
 
-    // [CRÍTICO - PERMISOS] Permisos para obtener todos los pedidos (Cohesión con Admin, Vendedor y Delivery)
-  // Busca este método y asegúrate de que tenga estos permisos exactos:
-@GetMapping("/pedidos")
-@PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'DELIVERY')") // <--- CRÍTICO: Añadir VENDEDOR y DELIVERY
-public List<Pedido> getAll() {
-    log.info("Solicitud de lista de pedidos autorizada.");
-    return pedidoService.GetAll();
-}
+    // [CRÍTICO] Endpoint específico para el Panel de Administración (Soluciona error 403)
+    @GetMapping("/admin/pedidos")
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'DELIVERY')")
+    public ResponseEntity<List<Pedido>> getAllPedidosAdmin() {
+        log.info("Admin/Vendedor: Solicitando lista completa de pedidos en /api/admin/pedidos");
+        try {
+            List<Pedido> pedidos = pedidoService.GetAll();
+            return ResponseEntity.ok(pedidos);
+        } catch (Exception e) {
+            log.error("Error crítico al obtener pedidos para admin:", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 
-    // [CRÍTICO - COHESIÓN CON FRONTEND] ENDPOINT PARA ACTUALIZAR ESTADO DE PEDIDO (Delivery/Admin)
+    // Actualizar estado del pedido (Delivery/Admin)
     @PutMapping("/admin/pedidos/{id}/estado") 
     @PreAuthorize("hasAnyRole('ADMIN', 'DELIVERY')")
     public ResponseEntity<?> updatePedidoStatus(
@@ -156,7 +154,6 @@ public List<Pedido> getAll() {
             @RequestBody EstadoUpdateRequestDTO estadoRequest) {
         log.info("Admin/Delivery: Actualizando estado del pedido ID: {} a '{}'", id, estadoRequest.getNuevoEstado());
         try {
-            // Llama al método que gestiona la lógica de la entidad Estado y actualiza el pedido
             Pedido actualizado = pedidoServiceImpl.actualizarEstadoPedido( 
                     id, 
                     estadoRequest.getNuevoEstado(), 
@@ -170,6 +167,8 @@ public List<Pedido> getAll() {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDTO("Error al actualizar el estado del pedido."));
         }
     }
+
+    // --- Endpoints exclusivos de ADMIN (Gestión profunda) ---
 
     @GetMapping("/pedidos/{id}")
     @PreAuthorize("hasRole('ADMIN')")
@@ -189,12 +188,9 @@ public List<Pedido> getAll() {
         log.info("Admin: Actualizando pedido ID: {}", id);
         try {
             Pedido pedidoExistente = pedidoService.FindByID(id); 
-            
-            // Permite que el administrador actualice el estado directamente.
             if (pedidoActualizado.getEstadoActual() != null) {
                 pedidoExistente.setEstadoActual(pedidoActualizado.getEstadoActual());
             }
-
             Pedido guardado = pedidoService.Save(pedidoExistente); 
             return ResponseEntity.ok(guardado);
         } catch (PedidoNoEncontradoException e) {

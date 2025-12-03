@@ -14,8 +14,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-// Importamos NoOpPasswordEncoder aunque esté deprecado (para pruebas)
-import org.springframework.security.crypto.password.NoOpPasswordEncoder; 
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder; // IMPORTANTE
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -23,7 +22,7 @@ import static org.springframework.security.config.Customizer.withDefaults;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity
+@EnableMethodSecurity // Permite @PreAuthorize en los controladores
 public class SecurityConfig {
 
     @Autowired
@@ -32,13 +31,10 @@ public class SecurityConfig {
     @Autowired
     private UserDetailsServiceImpl userDetailsService;
 
-    // Usamos @SuppressWarnings para que no moleste el aviso de "deprecated"
-    @SuppressWarnings("deprecation") 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        // Retorna la instancia que NO encripta (texto plano)
-         // return new BCryptPasswordEncoder(); // <--- COMENTAR ESTA LÍNEA
-        return NoOpPasswordEncoder.getInstance();
+        // USAMOS BCRYPT para coincidir con la Base de Datos (import.sql)
+        return new BCryptPasswordEncoder(); 
     }
 
     @Bean
@@ -60,12 +56,16 @@ public class SecurityConfig {
             .cors(withDefaults())
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
+                // --- RUTAS PÚBLICAS (Login y Clientes Anónimos) ---
                 .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/comentarios").permitAll() // <--- AGREGAR ESTA LÍNEA
+                // Permitir ver productos/menú sin login (Soluciona "No disponible")
                 .requestMatchers(HttpMethod.GET, "/api/menu").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/webhook/dialogflow").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/productos/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/productos/**").permitAll() 
                 .requestMatchers(HttpMethod.GET, "/api/categorias/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/comentarios").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/webhook/dialogflow").permitAll()
+                
+                // --- RUTAS PROTEGIDAS ---
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session
